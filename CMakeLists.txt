@@ -13,10 +13,10 @@ add_executable(uart_driver
 
 target_link_libraries(
     uart_driver
-    pico_stdlib    
-    hardware_uart    
-    hardware_gpio    
-    hardware_timer    
+    hardware_gpio
+    hardware_timer
+    hardware_resets
+    pico_platform
 )
 
 pico_enable_stdio_usb(uart_driver 0)
