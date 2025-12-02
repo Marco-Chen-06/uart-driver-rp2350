@@ -4,8 +4,49 @@ int main() {
 }
 
 
-void UART_init() {
+void UART_init(UART_t *uart, uint32_t baud_rate) {
+    // consider  implementing resets.h and gpio.h myself but it sounds like a lot of work
+    // also this only applies to UART0 so look into that too
+    hw_clear_bits(&resets_hw->reset, RESETS_RESET_UART0_BITS);
+    while (!(resets_hw->reset_done & RESETS_RESET_UART0_BITS)) {
+        // do nothing
+    }
+
+    // baud rate calculations
+    uint32_t baud = 0;
+    // TODO: IMPLEMENT UART_CLOCK_GET_HZ, then baud rate section is finished
+    uint32_t baud_rate_div = (8 * uart_clock_get_hz(uart) / baud_rate) + 1;
     
+    // integer part of baud rate divisor
+    uint32_t baud_ibrd = baud_rate_div >> 7; 
+
+    // float part of baud rate divisor
+    uint32_t baud_fbrd;
+
+    if (baud_ibrd == 0) {
+        baud_ibrd = 1;
+        baud_fbrd = 0;
+    } else if (baud_ibrd >= 65535) {
+        baud_ibrd = 65535;
+        baud_fbrd = 0;
+    } else {
+        baud_fbrd = (baud_rate_div & 0x7f) >> 1;
+    }
+
+    // TODO: haven't tested if this is the correct way to access memory yet
+    uart->ibrd = baud_ibrd;
+    uart->fbrd = baud_fbrd;
+
+    uart->lcr_h = 0;
+
+    baud = (4 * uart_clock_get_hz(uart)) / (64 * baud_ibrd + baud_fbrd);
+
+    // TODO: MAKE GOOD CONSTANTS FOR BITS
+    // allow 8 data bits per frame, and enable TX & RX FIFOs
+    uart->lcr_h = UART_UARTLCR_H_WLEN_BITS, UART_UARTLCR_H_FEN_BITS;
+
+    // enable uart peripheral, and TX & RX bits
+    uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
 }
 
 //  ---- EVERYTHING BELOW IS OLD CODE THAT IM ONLY LEAVING FOR REFERENCE!!

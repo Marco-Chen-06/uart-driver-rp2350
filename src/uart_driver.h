@@ -6,7 +6,7 @@
 
 // not sure if i should store these as UL
 #define UART0_BASE 0x40070000UL
-#define UART1_BASE 0x40078000
+#define UART1_BASE 0x40078000UL
 
 typedef struct {
     volatile uint32_t dr; // 0x000
@@ -30,8 +30,9 @@ typedef struct {
 
 #define UART0 ((UART_t *)UART0_BASE)
 #define UART1 ((UART_t *)UART1_BASE)
-void UART_init();
+
+void UART_init(UART_t *uart, uint32_t baud_rate);
 
 
-// void custom_uart_init(uart_inst_t *uart, uint32_t baud_rate);
+
 // int custom_uart_set_baud_rate(uart_inst_t *art, uint32_t baud_rate);
