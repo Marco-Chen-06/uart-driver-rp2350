@@ -16,6 +16,7 @@ target_link_libraries(
     hardware_gpio
     hardware_timer
     hardware_resets
+    hardware_clocks
     pico_platform
 )
 

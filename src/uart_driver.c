@@ -1,13 +1,22 @@
 #include "uart_driver.h"
 
 int main() { 
+    UART_init(UART0, 115200);
+    // UART_init((UART_t * )0x40070000UL, 115200) // equivalent of above line for learning purposes
+    uint8_t count = 0;
+    // just there because i want something to do while gdbing
+    while (count < 100) {
+        count++;
+    }
+ 
 }
 
 
 void UART_init(UART_t *uart, uint32_t baud_rate) {
-    // consider  implementing resets.h and gpio.h myself but it sounds like a lot of work
+    // consider implementing resets.h and gpio.h myself but it sounds like a lot of work
     // also this only applies to UART0 so look into that too
     hw_clear_bits(&resets_hw->reset, RESETS_RESET_UART0_BITS);
+    // i think this busy wait is ok, but I should consider improving it
     while (!(resets_hw->reset_done & RESETS_RESET_UART0_BITS)) {
         // do nothing
     }
@@ -39,14 +48,14 @@ void UART_init(UART_t *uart, uint32_t baud_rate) {
 
     uart->lcr_h = 0;
 
-    baud = (4 * uart_clock_get_hz(uart)) / (64 * baud_ibrd + baud_fbrd);
+    // baud = (4 * uart_clock_get_hz(uart)) / (64 * baud_ibrd + baud_fbrd);
 
-    // TODO: MAKE GOOD CONSTANTS FOR BITS
-    // allow 8 data bits per frame, and enable TX & RX FIFOs
-    uart->lcr_h = UART_UARTLCR_H_WLEN_BITS, UART_UARTLCR_H_FEN_BITS;
+    // // TODO: MAKE GOOD CONSTANTS FOR BITS
+    // // allow 8 data bits per frame, and enable TX & RX FIFOs
+    // uart->lcr_h = UART_UARTLCR_H_WLEN_BITS, UART_UARTLCR_H_FEN_BITS;
 
-    // enable uart peripheral, and TX & RX bits
-    uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
+    // // enable uart peripheral, and TX & RX bits
+    // uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
 }
 
 //  ---- EVERYTHING BELOW IS OLD CODE THAT IM ONLY LEAVING FOR REFERENCE!!

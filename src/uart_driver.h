@@ -4,9 +4,9 @@
 #include "hardware/structs/resets.h"
 #include "hardware/timer.h"
 
-// not sure if i should store these as UL
-#define UART0_BASE 0x40070000UL
-#define UART1_BASE 0x40078000UL
+// don't need these because pico already defines them
+// #define UART0_BASE 0x40070000UL
+// #define UART1_BASE 0x40078000UL
 
 typedef struct {
     volatile uint32_t dr; // 0x000
@@ -31,7 +31,13 @@ typedef struct {
 #define UART0 ((UART_t *)UART0_BASE)
 #define UART1 ((UART_t *)UART1_BASE)
 
+#define UART_CLOCK_NUM(uart) clk_peri
+
 void UART_init(UART_t *uart, uint32_t baud_rate);
+
+uint32_t UART_clock_get_hz(UART_t *uart) {
+    return clock_get_hz(UART_CLOCK_NUM(uart));
+}
 
 
 
