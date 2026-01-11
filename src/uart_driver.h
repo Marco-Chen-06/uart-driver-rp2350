@@ -6,6 +6,7 @@
 #include "pico/binary_info.h"
 #include "hardware/structs/resets.h"
 #include "hardware/clocks.h"
+#include "hardware/timer.h"
 
 // don't need these because pico already defines them
 // #define UART0_BASE 0x40070000UL
@@ -42,6 +43,10 @@ uint32_t UART_clock_get_hz(UART_t *uart) {
     return clock_get_hz(UART_CLOCK_NUM(uart));
 }
 
+// uartcr register byte offsets 
+#define UART_UARTCR_UARTEN_BITS 0x00000001UL // uartcr bit 0 uart enable
+#define UART_UARTCR_TXE_BITS    0x00000100UL // uartcr bit 8 tx enable
+#define UART_UARTCR_RXE_BITS    0x00000200UL // uartcr bit 9 rx enable
 
 
 // int custom_uart_set_baud_rate(uart_inst_t *art, uint32_t baud_rate);
