@@ -13,11 +13,11 @@ add_executable(uart_driver
 
 target_link_libraries(
     uart_driver
+    pico_stdlib      
     hardware_gpio
     hardware_timer
     hardware_resets
     hardware_clocks
-    pico_platform
 )
 
 pico_enable_stdio_usb(uart_driver 0)
@@ -25,8 +25,17 @@ pico_enable_stdio_uart(uart_driver 0)
 
 pico_add_extra_outputs(uart_driver)
 
-# add debug flag for gdb
-target_compile_definitions(uart_driver PRIVATE PICO_DEBUG=1)
+target_compile_definitions(uart_driver PRIVATE 
+    PICO_RP2350=1
+    PICO_DEBUG=1
+)
+
+# be explicit about using rp2350
+target_include_directories(uart_driver PRIVATE
+    ${PICO_SDK_PATH}/src/rp2350/hardware_regs/include
+    ${PICO_SDK_PATH}/src/rp2350/hardware_structs/include
+)
+
 target_compile_options(uart_driver PRIVATE -g3)
 
 

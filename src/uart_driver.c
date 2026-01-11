@@ -22,9 +22,9 @@ void UART_init(UART_t *uart, uint32_t baud_rate) {
     }
 
     // baud rate calculations
-    uint32_t baud = 0;
+    uint32_t baud = 0; // THIS DOES NOTHING ILL REMOVE IT WHEN I HAVE MORE TIME
     // TODO: IMPLEMENT UART_CLOCK_GET_HZ, then baud rate section is finished
-    uint32_t baud_rate_div = (8 * uart_clock_get_hz(uart) / baud_rate) + 1;
+    uint32_t baud_rate_div = (8 * UART_clock_get_hz(uart) / baud_rate) + 1;
     
     // integer part of baud rate divisor
     uint32_t baud_ibrd = baud_rate_div >> 7; 

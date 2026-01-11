@@ -1,8 +1,11 @@
+#ifndef UART_DRIVER_H
+#define UART_DRIVER_H
+
 #include <stdio.h>
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "hardware/structs/resets.h"
-#include "hardware/timer.h"
+#include "hardware/clocks.h"
 
 // don't need these because pico already defines them
 // #define UART0_BASE 0x40070000UL
@@ -11,9 +14,9 @@
 typedef struct {
     volatile uint32_t dr; // 0x000
     volatile uint32_t rsr; //0x004
-    volatile uint32_t pad0[4];  // occupy 4 bytes because there is a gap in memory in datasheet
+    volatile uint32_t RESERVED0[4];  // occupy 16 bytes because there is a gap in memory in datasheet
     volatile uint32_t fr; // 0x018
-    volatile uint32_t pad1; // occupy 4 bytes because there is a gap in memory in datasheet
+    volatile uint32_t RESERVED1; // occupy 4 bytes because there is a gap in memory in datasheet
     volatile uint32_t ilpr; // 0x020
     volatile uint32_t ibrd;
     volatile uint32_t fbrd;
@@ -42,3 +45,5 @@ uint32_t UART_clock_get_hz(UART_t *uart) {
 
 
 // int custom_uart_set_baud_rate(uart_inst_t *art, uint32_t baud_rate);
+
+#endif
