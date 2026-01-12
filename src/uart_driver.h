@@ -8,10 +8,6 @@
 #include "hardware/clocks.h"
 #include "hardware/timer.h"
 
-// don't need these because pico already defines them
-// #define UART0_BASE 0x40070000UL
-// #define UART1_BASE 0x40078000UL
-
 typedef struct {
     volatile uint32_t dr; // 0x000
     volatile uint32_t rsr; //0x004
@@ -29,7 +25,7 @@ typedef struct {
     volatile uint32_t mis;
     volatile uint32_t icr;
     volatile uint32_t dmacr;
-    // there are a few more peripheral and cell registers but idk what they do and im too lazy to type
+    // there are a few more peripheral and cell registers but ill add them later when I need to (lazy)
 } UART_t;
 
 #define UART0 ((UART_t *)UART0_BASE)
@@ -44,11 +40,12 @@ uint32_t UART_clock_get_hz(UART_t *uart) {
 }
 
 // uartcr register byte offsets 
-#define UART_UARTCR_UARTEN_BITS 0x00000001UL // uartcr bit 0 uart enable
-#define UART_UARTCR_TXE_BITS    0x00000100UL // uartcr bit 8 tx enable
-#define UART_UARTCR_RXE_BITS    0x00000200UL // uartcr bit 9 rx enable
+#define UART_UARTCR_UARTEN_BITS 0x00000001u // uartcr bit 0 uart enable
+#define UART_UARTCR_TXE_BITS    0x00000100u // uartcr bit 8 tx enable
+#define UART_UARTCR_RXE_BITS    0x00000200u // uartcr bit 9 rx enable
 
-
-// int custom_uart_set_baud_rate(uart_inst_t *art, uint32_t baud_rate);
+// uart lcr_h register byte offsets
+#define UART_UARTLCR_H_WLEN_BITS  0x00000060u // uartlcr_h wordlength bits
+#define UART_UARTLCR_H_FEN_BITS   0x00000010u // uartlcr_h fifo enable bits
 
 #endif
