@@ -6,6 +6,12 @@ int main() {
     uint32_t set_baud = UART_init(UART0, 115200);
     printf("%d", set_baud);
 
+    // set loopback enable bit for testing
+    reg_set_bits(&UART0->cr, 1 << UART_UARTCR_LBE_LSB);
+
+
+
+
     // perform completely meaningless operation so i can set a breakpoint in the count++ area in gdb for fun
     uint8_t count = 0;
     while (count < 100) {
@@ -124,8 +130,18 @@ uint32_t UART_init(UART_t *uart, uint32_t baud_rate) {
     */
     reg_write_masked(&uart->lcr_h, 3u << UART_UARTLCR_H_WLEN_LSB | 1u << UART_UARTLCR_H_FEN_BITS, UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS);
 
+    // enable rx and tx interrupts for uart peripheral
+    UART_enable_irqs(uart, true, true);
+
     // // enable uart peripheral, and TX & RX bits
     uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
+
+    // might be necessary if things go wrong
+    // gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    // gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+    // attach the interrupt handler
+    irq_set_exclusive_handler(UART0_IRQ, UART_rx_irq_handler);
 
     return baud;
 }
@@ -152,4 +168,8 @@ void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx) {
         // UARTTXINT triggers when transmit fifo becomes <= 1/8 full (minimum setting)
         reg_clear_bits(&uart->ifls, UART_UARTIFLS_TXIFLSEL_BITS);
     }
+}
+
+void UART_rx_irq_handler() {
+    // interrupt handler stuff
 }

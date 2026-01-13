@@ -40,6 +40,12 @@ uint32_t UART_init(UART_t *uart, uint32_t baud_rate);
 // set baud rate on UART peripheral, then return the calculated baud rate
 uint32_t UART_clock_get_hz(UART_t *uart);
 
+// rx interrupt handler
+void UART_rx_irq_handler();
+
+// not sure why we would ever transmit from an interrupt but maybe :)
+void UART_tx_irq_handler();
+
 /*
  * uart peripheral register memory addresses, offsets, and masks
  */
@@ -60,6 +66,7 @@ void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx);
 #define UART_UARTCR_UARTEN_BITS 0x00000001u // uartcr bit 0 uart enable
 #define UART_UARTCR_TXE_BITS    0x00000100u // uartcr bit 8 tx enable
 #define UART_UARTCR_RXE_BITS    0x00000200u // uartcr bit 9 rx enable
+#define UART_UARTCR_LBE_LSB     7u 
 
 // uart lcr_h register offsets and mass=js
 #define UART_UARTLCR_H_WLEN_BITS  0x00000060u // uartlcr_h wordlength bits
@@ -75,4 +82,6 @@ void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx);
 #define UART_UARTIFLS_TXIFLSEL_BITS 0x00000007u
 #define UART_UARTIFLS_RXIFSEL_BITS 0x00000038u
 
+#define UART0_IRQ 33
+#define UART1_IRQ 34
 #endif
