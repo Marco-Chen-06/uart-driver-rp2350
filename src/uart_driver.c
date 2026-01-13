@@ -3,7 +3,8 @@
 
 int main() { 
     // initialize UART0 with 115200 baud rate
-    UART_init(UART0, 115200);
+    uint32_t set_baud = UART_init(UART0, 115200);
+    printf("%d", set_baud);
 
     // perform completely meaningless operation so i can set a breakpoint in the count++ area in gdb for fun
     uint8_t count = 0;
@@ -70,7 +71,6 @@ static void UART_write_lcr_bits_masked(UART_t *uart, uint32_t values, uint32_t w
     uart->cr = cr_save;
 }
 
-// set baud rate on UART peripheral, then return the calculated baud rate
 static uint32_t UART_set_baudrate(UART_t *uart, uint32_t baud_rate) {
     uint32_t baud_rate_div = (8 * UART_clock_get_hz(uart) / baud_rate) + 1;
     
@@ -109,7 +109,7 @@ static uint32_t UART_set_baudrate(UART_t *uart, uint32_t baud_rate) {
 }
 
 
-void UART_init(UART_t *uart, uint32_t baud_rate) {
+uint32_t UART_init(UART_t *uart, uint32_t baud_rate) {
     reg_clear_bits(&resets_hw->reset, RESETS_RESET_UART0_BITS);
 
     while (!(resets_hw->reset_done & RESETS_RESET_UART0_BITS)) {
@@ -118,9 +118,38 @@ void UART_init(UART_t *uart, uint32_t baud_rate) {
 
     uint32_t baud = UART_set_baudrate(uart, baud_rate);
 
-    // allow 8 data bits per frame, and enable TX & RX FIFOs
-    uart->lcr_h = UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS;
+    /*
+     UART settings from the below masked write:
+     stick parity disabled, wlen = 8 bits, fifos enabled, one stop bit, parity disabled, normal use
+    */
+    reg_write_masked(&uart->lcr_h, 3u << UART_UARTLCR_H_WLEN_LSB | 1u << UART_UARTLCR_H_FEN_BITS, UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS);
 
     // // enable uart peripheral, and TX & RX bits
     uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
+
+    return baud;
+}
+
+// set baud rate on UART peripheral, then return the calculated baud rate
+uint32_t UART_clock_get_hz(UART_t *uart) {
+    return clock_get_hz(UART_CLOCK_NUM(uart));
+}
+
+
+void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx) {
+    // converts enable_rx and tx to a 1 or 0 based on the boolean value
+    uint32_t enable_rx_as_bit = enable_rx;
+    uint32_t enable_tx_as_bit = enable_tx;
+    uart->imsc = (enable_rx_as_bit << UART_UARTIMSC_RXIM_LSB) | 
+                 (enable_rx_as_bit << UART_UARTIMSC_RTIM_LSB) | 
+                 (enable_tx_as_bit << UART_UARTIMSC_TXIM_LSB);
+    
+    if (enable_rx) {
+        // UARTRXINT triggers when receive fifo becomes >= 1/8 full (minimum setting)
+        reg_clear_bits(&uart->ifls, UART_UARTIFLS_RXIFSEL_BITS);
+    }
+    if (enable_tx) {
+        // UARTTXINT triggers when transmit fifo becomes <= 1/8 full (minimum setting)
+        reg_clear_bits(&uart->ifls, UART_UARTIFLS_TXIFLSEL_BITS);
+    }
 }
