@@ -1,2 +1,4 @@
 # uart-driver-rp2350
-custom uart driver implementation for the rp2350 written without uart.h
+Interrupt-driven UART driver implementation for the rp2350. 
+
+Writen in bare-metal, without uart.h and minimal pico-sdk usage
