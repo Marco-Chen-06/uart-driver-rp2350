@@ -40,6 +40,7 @@ int main() {
   Returns the initally saved state of the UART control register.
  */
 static uint32_t UART_disable_before_lcr_write(UART_t *uart) {
+    // (The long comment below was written by rp2_common from pico sdk. I left it in because it was useful.)
     // Notes from PL011 reference manual:
     //
     // - Before writing the LCR, if the UART is enabled it needs to be
