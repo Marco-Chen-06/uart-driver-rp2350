@@ -2,12 +2,12 @@
 #define UART_DRIVER_H
 
 #include <stdio.h>
+#include <string.h>
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "hardware/structs/resets.h"
 #include "hardware/clocks.h"
 #include "hardware/timer.h"
-
 /* 
  * rp2350 uart peripheral memory layout
  */
@@ -43,8 +43,11 @@ uint32_t UART_clock_get_hz(UART_t *uart);
 // rx interrupt handler
 void UART_rx_irq_handler();
 
-// not sure why we would ever transmit from an interrupt but maybe :)
-void UART_tx_irq_handler();
+// transmit byte
+void UART_write_byte(UART_t *uart, uint8_t byte);
+
+// transmit bytes
+void UART_write_bytes(UART_t *uart, uint8_t *bytes, size_t len);
 
 /*
  * uart peripheral register memory addresses, offsets, and masks
@@ -60,18 +63,25 @@ void UART_tx_irq_handler();
  * If enable_rx is true, an interrupt will be fired when RX fifo contains data
  * If enable_tx is true, an interrupt will be fired when the TX fifo needs data
  */
-void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx);
+void UART_set_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx);
 
+void UART_set_hw_flow(UART_t *uart, bool enable_cts, bool enable_rts);
 // uartcr register offsets and masks
-#define UART_UARTCR_UARTEN_BITS 0x00000001u // uartcr bit 0 uart enable
-#define UART_UARTCR_TXE_BITS    0x00000100u // uartcr bit 8 tx enable
-#define UART_UARTCR_RXE_BITS    0x00000200u // uartcr bit 9 rx enable
+#define UART_UARTCR_UARTEN_BITS 0x00000001u // masks bit 0 of uartcr
+#define UART_UARTCR_TXE_BITS    0x00000100u // masks bit 8 of uartcr
+#define UART_UARTCR_RXE_BITS    0x00000200u // masks bit 9 of uartcr
+#define UART_UARTCR_RTSEN_BITS  0x00004000u // masks bit 14 of uartcr
+#define UART_UARTCR_CTSEN_BITS  0x00008000u // masks bit 15 of uartcr
 #define UART_UARTCR_LBE_LSB     7u 
+#define UART_UARTCR_RTSEN_LSB   14u
+#define UART_UARTCR_CTSEN_LSB   15u
 
-// uart lcr_h register offsets and mass=js
-#define UART_UARTLCR_H_WLEN_BITS  0x00000060u // uartlcr_h wordlength bits
-#define UART_UARTLCR_H_FEN_BITS   0x00000010u // uartlcr_h fifo enable bits
-#define UART_UARTLCR_H_WLEN_LSB   5u // 
+// uart lcr_h register offsets and masks
+#define UART_UARTLCR_H_WLEN_BITS  0x00000060u // masks bits 5-6 of uartlcr_h
+#define UART_UARTLCR_H_FEN_BITS   0x00000010u // masks bit 4 of uartlcr_h
+#define UART_UARTLCR_H_WLEN_LSB   5u  
+#define UART_UARTLCR_H_FEN_LSB    4u
+
 
 // uart imsc register offsets and masks
 #define UART_UARTIMSC_TXIM_LSB 5u
@@ -79,9 +89,13 @@ void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx);
 #define UART_UARTIMSC_RTIM_LSB 6u
 
 // uart ifls register offsets and masks
-#define UART_UARTIFLS_TXIFLSEL_BITS 0x00000007u
-#define UART_UARTIFLS_RXIFSEL_BITS 0x00000038u
+#define UART_UARTIFLS_TXIFLSEL_BITS 0x00000007u // masks bits 0-3 of uartifls
+#define UART_UARTIFLS_RXIFSEL_BITS 0x00000038u // masks bits 3-5 of uartifls
 
-#define UART0_IRQ 33
-#define UART1_IRQ 34
+// uart fr register offsets and masks
+#define UART_UARTFR_TXFF_BITS 0x00000020u // masks bit 5 of uartfr
+#define UART_UARTFR_RXFE_BITS 0x00000010u // masks bit 4 of uartfr
+
+#define UART0_IRQ 33 // UART0 IRQ number from vector table
+#define UART1_IRQ 34 // UART1 IRQ number from vector table
 #endif

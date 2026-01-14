@@ -1,27 +1,41 @@
 #include "uart_driver.h"
 #include "register_utils.h"
 
+#define UART_TX_PIN 0 // GP0 UART0 TX
+#define UART_RX_PIN 1 // GP1 UART0 RX
+
+volatile uint8_t receive_buf[BUFSIZ]; // holds the received data
+volatile uint32_t receive_buf_index = 0; // indexes receive_buf
+
 int main() { 
     // initialize UART0 with 115200 baud rate
     uint32_t set_baud = UART_init(UART0, 115200);
-    printf("%d", set_baud);
+
+    // temporarily disabled for loopback testing (uncomment below line when not doing loopback testing)
+    // UART_set_hw_flow(UART0, true, true);
+
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
     // set loopback enable bit for testing
     reg_set_bits(&UART0->cr, 1 << UART_UARTCR_LBE_LSB);
 
+    // write "Hello" to UART0 peripheral
+    uint8_t send_buf[BUFSIZ];
+    strcpy(send_buf, "Hello");
+    UART_write_bytes(UART0, send_buf, 5);
 
+    // busy wait so that gdb can process the interrupts
+    busy_wait_ms(1000);
 
-
-    // perform completely meaningless operation so i can set a breakpoint in the count++ area in gdb for fun
-    uint8_t count = 0;
-    while (count < 100) {
-        count++;
+    for (size_t i = 0; i < receive_buf_index; i++) {
+        printf("%c", receive_buf[i]);
     }
- 
+    printf("\n");
 }
 
 /* 
-  Borrowed from uart.h of the pico sdk
+  Borrowed from uart.h of the pico sdk.
   Disables UART peripheral and wait long enough for any TX or RX to finish.
   Returns the initally saved state of the UART control register.
  */
@@ -77,6 +91,7 @@ static void UART_write_lcr_bits_masked(UART_t *uart, uint32_t values, uint32_t w
     uart->cr = cr_save;
 }
 
+// Sets baud rate of UART peripheral to as close as possible to baud_rate parameter
 static uint32_t UART_set_baudrate(UART_t *uart, uint32_t baud_rate) {
     uint32_t baud_rate_div = (8 * UART_clock_get_hz(uart) / baud_rate) + 1;
     
@@ -125,23 +140,20 @@ uint32_t UART_init(UART_t *uart, uint32_t baud_rate) {
     uint32_t baud = UART_set_baudrate(uart, baud_rate);
 
     /*
-     UART settings from the below masked write:
+     Set up UART with the following settings:
      stick parity disabled, wlen = 8 bits, fifos enabled, one stop bit, parity disabled, normal use
     */
-    reg_write_masked(&uart->lcr_h, 3u << UART_UARTLCR_H_WLEN_LSB | 1u << UART_UARTLCR_H_FEN_BITS, UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS);
+    reg_write_masked(&uart->lcr_h, 3u << UART_UARTLCR_H_WLEN_LSB | 1u << UART_UARTLCR_H_FEN_LSB, UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS);
 
     // enable rx and tx interrupts for uart peripheral
-    UART_enable_irqs(uart, true, true);
+    UART_set_enable_irqs(uart, true, true);
 
     // // enable uart peripheral, and TX & RX bits
     uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
 
-    // might be necessary if things go wrong
-    // gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-    // gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-
-    // attach the interrupt handler
+    // attach and enable the RX interrupt handler
     irq_set_exclusive_handler(UART0_IRQ, UART_rx_irq_handler);
+    irq_set_enabled(UART0_IRQ, true);
 
     return baud;
 }
@@ -151,8 +163,7 @@ uint32_t UART_clock_get_hz(UART_t *uart) {
     return clock_get_hz(UART_CLOCK_NUM(uart));
 }
 
-
-void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx) {
+void UART_set_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx) {
     // converts enable_rx and tx to a 1 or 0 based on the boolean value
     uint32_t enable_rx_as_bit = enable_rx;
     uint32_t enable_tx_as_bit = enable_tx;
@@ -170,6 +181,60 @@ void UART_enable_irqs(UART_t *uart, bool enable_rx, bool enable_tx) {
     }
 }
 
+void UART_set_hw_flow(UART_t *uart, bool enable_cts, bool enable_rts) {
+    // converts enable_rx and tx to a 1 or 0 based on the boolean value
+    uint32_t enable_cts_as_bit = enable_cts;
+    uint32_t enable_rts_as_bit = enable_rts;
+    reg_write_masked(&uart->cr, enable_cts_as_bit << UART_UARTCR_CTSEN_LSB | enable_rts_as_bit << UART_UARTCR_RTSEN_LSB,
+                     UART_UARTCR_CTSEN_BITS | UART_UARTCR_RTSEN_BITS);
+}
+
+// interrupt handler which will fire whenever we receive data
 void UART_rx_irq_handler() {
-    // interrupt handler stuff
+    uint32_t status = UART0->mis;
+
+    /*
+     * TODO: Make this a switch case so it's easier to error handle in the future
+     */
+
+    // handle rx interrupt case
+    if (status & (1u << UART_UARTIMSC_RXIM_LSB)) {
+        // keep receiving while RX buffer is not empty
+        while (!(UART0->fr & UART_UARTFR_RXFE_BITS))
+        {
+          receive_buf[receive_buf_index++] = UART0->dr;      
+        }
+    }
+
+    // handle receive timeout interrupt case
+    if (status & (1u << UART_UARTIMSC_RTIM_LSB)) {
+        /* From the PL011 Reference Manual, section 2, page 24:
+        * The receive timeout interrupt is asserted when the receive FIFO is not empty, and no
+        * more data is received during a 32-bit period. The receive timeout interrupt is cleared
+        * either when the FIFO becomes empty through reading all the data (or by reading the
+        * holding register), or when a 1 is written to the corresponding bit of the Interrupt Clear
+        * Register, UARTICR
+        */
+        UART0->icr = 1u << UART_UARTIMSC_RTIM_LSB; 
+        // keep receiving while RX buffer is not empty
+        while (!(UART0->fr & UART_UARTFR_RXFE_BITS))
+        {
+          receive_buf[receive_buf_index++] = UART0->dr;      
+        }
+    }
+}
+
+// write 1 byte for transmission
+void UART_write_byte(UART_t *uart, uint8_t byte) {
+    uart->dr = byte;
+}
+
+// write multiple bytes (a string) for transmission
+void UART_write_bytes(UART_t *uart, uint8_t *bytes, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        while(uart->fr & UART_UARTFR_TXFF_BITS) {
+            // wait for tx fifo to not be full
+        }
+        uart->dr = *bytes++;
+    }
 }

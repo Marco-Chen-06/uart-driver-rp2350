@@ -10,6 +10,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 pico_sdk_init()
 
+# force no optimizations
+set(PICO_DEOPTIMIZED_DEBUG 1)
+
 add_executable(uart_driver
     src/uart_driver.c
     src/register_utils.c
@@ -40,6 +43,12 @@ target_include_directories(uart_driver PRIVATE
     ${PICO_SDK_PATH}/src/rp2350/hardware_structs/include
 )
 
-target_compile_options(uart_driver PRIVATE -g3)
+# remove optimization for debugging
+target_compile_options(uart_driver PRIVATE 
+    -g3         
+    -O0        
+    -fno-inline 
+)
+
 
 
