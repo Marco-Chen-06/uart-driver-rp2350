@@ -1,12 +1,50 @@
+/*
+ * Bugs/TODO list:
+ * Hello appears like so: \376Hello
+ * Where does the 376 come from?
+ * 
+ * GDB changes results of receive_buf based on if I step through the UART_write_bytes function.
+ * If I continue straight through, I get: 
+ * "B\225\261\261\275!\225\261\261\275\377 \000 <1012 repeats"
+ * If I do step through, I get "\376HelloHello \000 <1012 repeats>"
+ * I beleve there is some sort of race condition that debugging changes.
+ * I will test this with an oscilloscope to confirm or deny these assumptions.
+ * 
+ * If I want to debug with print statements like an arduino, what is
+ * the best workflow?
+ */
+
 #include "uart_driver.h"
 #include "register_utils.h"
 
 #define UART_TX_PIN 0 // GP0 UART0 TX
 #define UART_RX_PIN 1 // GP1 UART0 RX
 
+#define RECEIVE_BUF_SIZE 16384 // size of receive_buf in bytes
 volatile uint8_t receive_buf[BUFSIZ]; // holds the received data
 volatile uint32_t receive_buf_index = 0; // indexes receive_buf
 
+// // transmit to pin example
+// int main() { 
+//     // initialize UART0 with 115200 baud rate
+//     uint32_t set_baud = UART_init(UART0, 115200);
+
+//     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+//     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+
+//     // write "Hello" to UART0 peripheral
+//     uint8_t send_buf[BUFSIZ];
+//     strcpy(send_buf, "Hello");
+//     // UART_write_bytes(UART0, send_buf, 5);
+
+//     // infinite loop infinitely write Hello
+//     for (;;) {
+//         UART_write_bytes(UART0, send_buf, 5);
+//         tight_loop_contents();
+//     }
+// }
+
+// loopback example
 int main() { 
     // initialize UART0 with 115200 baud rate
     uint32_t set_baud = UART_init(UART0, 115200);
@@ -23,15 +61,18 @@ int main() {
     // write "Hello" to UART0 peripheral
     uint8_t send_buf[BUFSIZ];
     strcpy(send_buf, "Hello");
+    // goal: write HelloHello into send_buf
+    UART_write_bytes(UART0, send_buf, 5);
     UART_write_bytes(UART0, send_buf, 5);
 
-    // busy wait so that gdb can process the interrupts
-    busy_wait_ms(1000);
-
-    for (size_t i = 0; i < receive_buf_index; i++) {
-        printf("%c", receive_buf[i]);
+    // issue: differnet behavior based on how GDB steps through code
+    while (receive_buf_index < 10) {
+        tight_loop_contents();
     }
-    printf("\n");
+
+    for (;;) {
+        tight_loop_contents();
+    }
 }
 
 /* 
@@ -135,6 +176,7 @@ uint32_t UART_init(UART_t *uart, uint32_t baud_rate) {
     reg_clear_bits(&resets_hw->reset, RESETS_RESET_UART0_BITS);
 
     while (!(resets_hw->reset_done & RESETS_RESET_UART0_BITS)) {
+        tight_loop_contents();
         // do nothing (I'll try to do better than a busy wait once I get the TX and RX working)
     }
 
@@ -146,8 +188,8 @@ uint32_t UART_init(UART_t *uart, uint32_t baud_rate) {
     */
     reg_write_masked(&uart->lcr_h, 3u << UART_UARTLCR_H_WLEN_LSB | 1u << UART_UARTLCR_H_FEN_LSB, UART_UARTLCR_H_WLEN_BITS | UART_UARTLCR_H_FEN_BITS);
 
-    // enable rx and tx interrupts for uart peripheral
-    UART_set_enable_irqs(uart, true, true);
+    // enable rx interrupts for uart peripheral. Disable tx because we are sending manually for now.
+    UART_set_enable_irqs(uart, true, false);
 
     // // enable uart peripheral, and TX & RX bits
     uart->cr = UART_UARTCR_UARTEN_BITS | UART_UARTCR_TXE_BITS | UART_UARTCR_RXE_BITS;
@@ -203,7 +245,9 @@ void UART_rx_irq_handler() {
         // keep receiving while RX buffer is not empty
         while (!(UART0->fr & UART_UARTFR_RXFE_BITS))
         {
-          receive_buf[receive_buf_index++] = UART0->dr;      
+          // process the character in the data register into receive_buf, but mask it to avoid error bits
+          receive_buf[receive_buf_index] = (UART0->dr) & 0xFF;       
+          receive_buf_index = (receive_buf_index + 1) % RECEIVE_BUF_SIZE;    
         }
     }
 
@@ -220,7 +264,9 @@ void UART_rx_irq_handler() {
         // keep receiving while RX buffer is not empty
         while (!(UART0->fr & UART_UARTFR_RXFE_BITS))
         {
-          receive_buf[receive_buf_index++] = UART0->dr;      
+          // process the character in the data register into receive_buf, but mask it to avoid error bits
+          receive_buf[receive_buf_index] = (UART0->dr) & 0xFF;       
+          receive_buf_index = (receive_buf_index + 1) % RECEIVE_BUF_SIZE;  
         }
     }
 }
@@ -234,6 +280,7 @@ void UART_write_byte(UART_t *uart, uint8_t byte) {
 void UART_write_bytes(UART_t *uart, uint8_t *bytes, size_t len) {
     for (size_t i = 0; i < len; i++) {
         while(uart->fr & UART_UARTFR_TXFF_BITS) {
+            tight_loop_contents();
             // wait for tx fifo to not be full
         }
         uart->dr = *bytes++;
